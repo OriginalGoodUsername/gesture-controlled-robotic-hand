@@ -1,6 +1,6 @@
 /*
   I2C address scanner. Open Serial Monitor at 9600 baud.
-  The hand firmware expects the PCA9685 at 0x40. If another address is found,
+  The hand firmware expects the PCA9685 at 0x40. If its address differs,
   check the address jumpers and update the driver address to match.
   No response: check SDA, SCL, power, and ground.
 */

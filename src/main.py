@@ -32,12 +32,13 @@ arduino = None
 available_ports = [port.device for port in serial.tools.list_ports.comports()]
 print("Available COM ports:", available_ports)
 
+ARDUINO_PORT = 'COM5'
 try:
-    arduino = serial.Serial('COM3', 9600)
+    arduino = serial.Serial(ARDUINO_PORT, 9600)
     time.sleep(2)
-    print("Connected to Arduino on COM3")
+    print(f"Connected to Arduino on {ARDUINO_PORT}")
 except serial.SerialException as e:
-    print(f"Warning: Could not connect to Arduino on COM3: {e}")
+    print(f"Warning: Could not connect to Arduino on {ARDUINO_PORT}: {e}")
     print(f"Available ports: {available_ports}")
     print("Running in DEMO mode without servo control...\n")
 
@@ -64,10 +65,10 @@ selected_servo = 0
 manual_angles = list(OPEN_ANGLES)
 servo_names = ["Wrist", "Pinky", "Ring", "Middle", "Index", "Thumb"]
 
-# Smoothing: EMA keeps angles stable when detection is noisy
-SMOOTH      = 0.15   # 0 = frozen, 1 = raw — lower = smoother/slower
-MAX_STEP    = 12     # maximum commanded angle change per frame
-SNAP_THRESH = 10      # snap to 0 or 180 when within this many degrees (removes endpoint jitter)
+# Exponential moving average for servo commands.
+SMOOTH      = 0.15   # 0 = frozen, 1 = raw; lower values smooth more slowly
+MAX_STEP    = 12     # maximum step before endpoint snapping, in degrees per frame
+SNAP_THRESH = 10      # snap to 0 or 180 within this many degrees
 HOLD_FRAMES = 15     # frames to hold last position when hand disappears
 
 smoothed_angles    = list(OPEN_ANGLES)
@@ -75,7 +76,7 @@ last_valid_angles  = list(OPEN_ANGLES)
 last_sent_angles   = list(OPEN_ANGLES)
 frames_no_hand     = 0
 
-LM_SMOOTH  = 0.55   # EMA for drawn landmark positions — lower = steadier, higher = closer to hand
+LM_SMOOTH  = 0.55   # EMA for drawn landmarks; lower values smooth more slowly
 smoothed_lm = None  # list of [x, y] updated each frame
 
 
@@ -92,13 +93,12 @@ def draw_hand_mesh(image, lm_xy):
 
 
 def get_finger_angles(hand_landmarks):
-    """
-    Returns [wrist, pinky, ring, middle, index, thumb] in servo angle space.
+    """Return servo angles in wrist, pinky, ring, middle, index, thumb order.
 
     Finger curl uses tip-to-wrist distance relative to knuckle-to-wrist
     distance, scaled between the calibrated open and closed values.
-    Thumb position uses its distance from the index knuckle relative to palm
-    size, plus a cross-product check for crossing the knuckle line.
+    Thumb position uses distance from the index knuckle relative to palm
+    size, plus a check for crossing the knuckle line.
     """
 
     def dist(a, b):
@@ -127,15 +127,14 @@ def get_finger_angles(hand_landmarks):
         if palm_size < 0.001:
             return 0.0
 
-        # Detect thumb crossing behind the palm via knuckle-line cross product.
-        # The wrist is always on the "outside" (thumb side) of the knuckle line.
-        # If the thumb tip crosses to the opposite side, it is behind the palm = closed.
+        # Treat the thumb as closed when its tip and the wrist lie on
+        # opposite sides of the index-to-pinky knuckle line.
         kx = pinky_mcp.x - index_mcp.x
         ky = pinky_mcp.y - index_mcp.y
         thumb_sign = kx * (thumb_tip.y - index_mcp.y) - ky * (thumb_tip.x - index_mcp.x)
         wrist_sign = kx * (wrist_lm.y  - index_mcp.y) - ky * (wrist_lm.x  - index_mcp.x)
         if (thumb_sign > 0) != (wrist_sign > 0):
-            return 1.0  # thumb crossed into palm → fully closed
+            return 1.0  # opposite side of knuckle line: closed
 
         # Side-to-side abduction by distance
         ratio = dist(thumb_tip, index_mcp) / palm_size
@@ -158,10 +157,7 @@ def get_finger_angles(hand_landmarks):
 
 
 def send_servo_angles(angles):
-    """
-    Send angles directly to Arduino. Angles are already in servo space:
-    [wrist, pinky, ring, middle, index, thumb] → channels [0,1,2,3,4,5]
-    """
+    """Send wrist, pinky, ring, middle, index, thumb angles to channels 0-5."""
     if arduino is None:
         return
     data = ','.join(map(str, angles)) + '\n'

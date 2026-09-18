@@ -14,8 +14,8 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 #define THUMB_SERVO  5
 
 // Per-channel pulse limits (4096 ticks at 50 Hz = 20 ms period)
-// ch 0-4: calibrated MG996R pulse counts
-// ch 5:   micro   → tighter range to prevent stall/overheat
+// ch 0-4: MG996R pulse limits for this build
+// ch 5: micro servo with a narrower range to limit travel
 const uint16_t SERVO_MIN[6] = {80, 80, 80, 80, 80, 175};
 const uint16_t SERVO_MAX[6] = {520, 520, 520, 520, 520, 480};
 

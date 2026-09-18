@@ -1,13 +1,11 @@
-"""Direct servo test — bypasses camera/MediaPipe.
-Sends open/closed poses straight to the Arduino to check the hardware path.
-"""
+"""Alternate open and closed poses over serial without camera input."""
 import serial
 import time
 
 OPEN   = [90, 0,   0,   180, 180, 90]
 CLOSED = [90, 180, 180, 0,   0,   0]
 
-s = serial.Serial("COM3", 9600)
+s = serial.Serial("COM5", 9600)
 time.sleep(2)  # Arduino resets when the port opens; wait for it to boot
 print("port open, sending sweeps...")
 
